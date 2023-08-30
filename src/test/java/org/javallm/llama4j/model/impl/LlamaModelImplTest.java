@@ -21,7 +21,7 @@ public class LlamaModelImplTest {
     // Use a tiny model for testing purpose
     static {
         try {
-            File model = new File(LlamaModelImplTest.class.getClassLoader().getResource("TinyLLama-v0.ggmlv3.q4_0.bin").getFile());
+            File model = new File(LlamaModelImplTest.class.getClassLoader().getResource("tinyllamas-stories-260k-f32.gguf").getFile());
             MODEL_PATH = model.getAbsolutePath();
         } catch (Exception e) {
             throw new RuntimeException(e);
@@ -74,9 +74,62 @@ public class LlamaModelImplTest {
         String text = "你好！From LLaMA.cpp";
         int[] tokens = model.tokenize(text, false);
         System.out.println(Arrays.toString(tokens));
-        String decoded = model.detokenize(tokens);
+
+        // remove leading BOS
+        String decoded = model.detokenize(tokens).trim();
+
         System.out.printf("Decoded -> %s%n", decoded);
         assertThat(StringUtils.equals(text, decoded)).isTrue();
+    }
+
+    @Test
+    public void test_detokenize_in_sequence() throws Exception {
+        ModelParameters params = ModelParameters.builder()
+                .modelPath(MODEL_PATH)
+                .nThreads(4)
+                .build();
+        LlamaModel model = new LlamaModelImpl(params);
+
+        String text = "你好！世界！";
+        int[] tokens = model.tokenize(text, false);
+
+        // BOS is not added
+        for (int token : tokens) {
+            assertThat(token).isNotEqualTo(model.bosToken());
+        }
+
+        StringBuilder builder = new StringBuilder();
+
+        int i = 0, j = 0;
+        int nPiece = 0;
+        while (i < tokens.length) {
+            while (true) {
+                if (j > tokens.length) {
+                    break;
+                }
+                String piece = model.detokenize(Arrays.copyOfRange(tokens, i, j));
+                if (StringUtils.isBlank(piece)) {
+                    j++;
+                } else {
+                    // left trim the first piece to remove the BOS token
+                    if (nPiece == 0) {
+                        piece = piece.replaceAll("^\\s+", "");
+                    }
+                    System.out.printf("tokens = [%d, %d] -> str = [%s]\n", i, j, piece);
+                    builder.append(piece);
+                    i = j;
+                    nPiece++;
+                    break;
+                }
+            }
+        }
+
+        String result = builder.toString();
+
+        System.out.printf("Final output = [%s]\n", result);
+        assertThat(StringUtils.equals(text, result)).isTrue();
+
+        model.close();
     }
 
     @Test
@@ -138,6 +191,55 @@ public class LlamaModelImplTest {
 
         String response = model.detokenize(toArray(lastTokens));
         System.out.println(response);
+
+        model.close();
+    }
+
+    @Test
+    public void test_inference_stream() throws Exception {
+        // Model initialization
+        ModelParameters params = ModelParameters.builder()
+                .modelPath(MODEL_PATH)
+                .nThreads(4)
+                .contextSize(2048)
+                .build();
+        LlamaModel model = new LlamaModelImpl(params);
+        assertThat(model).isNotNull();
+
+        // Prompt processing
+        String prompt = "Once upon a time, there was a little girl named Lily. She loved playing with her toys on top of her bed. One day, she decided to have a tea party with her stuffed animals. ";
+        int[] tokens = model.tokenize(prompt, true);
+        model.evaluate(tokens);
+
+        System.out.println("\n==================== PROMPT ====================");
+        System.out.print(prompt);
+
+        // Inference
+        int maxTokens = 2048;
+        PenalizeParameters penalizeParams = PenalizeParameters.builder().build();
+        SamplingParameters samplingParameters = SamplingParameters.builder().build();
+
+        System.out.println("\n==================== RESPONSE ====================");
+
+        ArrayList<Integer> cache = new ArrayList<>();
+        for (int i = 0; i < maxTokens; i++) {
+            int id = model.sample(samplingParameters, penalizeParams);
+            if (id == model.eosToken()) {
+                break;
+            }
+
+            // stream decode
+            cache.add(id);
+            String piece = model.detokenize(toArray(cache));
+            if (StringUtils.isNotBlank(piece)) {
+                cache.clear();
+                System.out.print(piece);
+            }
+
+            model.evaluate(new int[]{id});
+
+            Thread.sleep(1);
+        }
 
         model.close();
     }

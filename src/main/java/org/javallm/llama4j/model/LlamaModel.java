@@ -20,7 +20,7 @@ public interface LlamaModel extends AutoCloseable {
     }
 
     /**
-     * Recover text from tokens
+     * Recover text from tokens, return null if the tokens do not contain a valid UTF-8 String
      * @param tokens tokens to be de-tokenized
      * @return the resulting text
      */
