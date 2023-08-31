@@ -71,9 +71,9 @@ public class LlamaModelImpl implements LlamaModel {
         this._n_embed = llama_n_embd(this._context);
         Preconditions.checkState(this._n_embed >= 0);
 
-        this._token_bos = llama_token_bos();
-        this._token_eos = llama_token_eos();
-        this._token_nl = llama_token_nl();
+        this._token_bos = llama_token_bos(this._context);
+        this._token_eos = llama_token_eos(this._context);
+        this._token_nl = llama_token_nl(this._context);
 
         applyLoRA();
 
@@ -164,18 +164,40 @@ public class LlamaModelImpl implements LlamaModel {
     @Override
     public String detokenize(int[] tokens) {
         ByteArrayOutputStream stream = new ByteArrayOutputStream();
+        // We must detokenize all bytes at once, since a word can be represented by more than one byte
         for (int token : tokens) {
-            // We must detokenize all bytes at once, since a word can be represented by more than one byte
-            BytePointer pointer = llama_token_to_str(_context, token);
-            byte[] bytes = pointer.getStringBytes();
+            int bufferSize = 8;
+            BytePointer buffer = new BytePointer(bufferSize);
+            int n = llama_token_to_piece(_context, token, buffer, bufferSize);
+            if (n < 0) {
+                buffer.close();
+                buffer = new BytePointer(n);
+                int check = llama_token_to_piece(_context, token, buffer, n);
+                Preconditions.checkState(check == -n);
+            }
+
+            byte[] data = Arrays.copyOf(buffer.getStringBytes(), Math.abs(n));
             try {
-                stream.write(bytes);
-            } catch (IOException e) {
-                throw new RuntimeException(String.format("Failed to detokenize: %s", Arrays.toString(tokens)), e);
+                stream.write(data);
+            } catch (IOException ex) {
+                throw new RuntimeException(String.format("Failed to detokenize: %s", Arrays.toString(tokens)), ex);
             }
         }
-        byte[] result = stream.toByteArray();
-        return new String(result, StandardCharsets.UTF_8);
+        byte[] bytes = stream.toByteArray();
+        return convertToUtf8String(bytes);
+    }
+
+    /**
+     * Convert bytes to UTF-8 String. If the byte array contains incomplete code point, discard it
+     * @param bytes input
+     * @return resulting string
+     */
+    private String convertToUtf8String(byte[] bytes) {
+        String result = new String(bytes, StandardCharsets.UTF_8);
+        if ( bytes.length != result.getBytes(StandardCharsets.UTF_8).length) {
+            return null;
+        }
+        return result;
     }
 
     @Override
@@ -404,12 +426,15 @@ public class LlamaModelImpl implements LlamaModel {
     private llama_context_params initLLaMAContextParams(ModelParameters params) {
         llama_context_params llama_params = llama_context_default_params();
 
+        int nGPULayers = Integer.parseInt(params.getExtra().getOrDefault("n_gpu_layers", "0"));
+        llama_params.n_gpu_layers(nGPULayers);
+
         llama_params.n_ctx(params.getContextSize());
         llama_params.n_batch(params.getBatchSize());
         llama_params.seed(params.getSeed());
 
-//        llama_params.rope_freq_base(params.getRopeFreqBase());
-//        llama_params.rope_freq_scale(params.getRopeFreqScale());
+        llama_params.rope_freq_base(params.getRopeFreqBase());
+        llama_params.rope_freq_scale(params.getRopeFreqScale());
 
         llama_params.embedding(params.isEmbeddingMode());
 

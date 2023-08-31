@@ -1,14 +1,15 @@
 package org.javallm.llama4j.model.impl;
 
+import com.google.common.collect.ImmutableMap;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.javallm.llama4j.TestUtils;
 import org.javallm.llama4j.model.LlamaModel;
 import org.javallm.llama4j.model.params.ModelParameters;
 import org.javallm.llama4j.model.params.PenalizeParameters;
 import org.javallm.llama4j.model.params.SamplingParameters;
 import org.junit.jupiter.api.Test;
 
-import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
 
@@ -16,17 +17,8 @@ import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
 import static org.assertj.core.api.AssertionsForClassTypes.assertThatThrownBy;
 
 public class LlamaModelImplTest {
-    private static final String MODEL_PATH;
-
-    // Use a tiny model for testing purpose
-    static {
-        try {
-            File model = new File(LlamaModelImplTest.class.getClassLoader().getResource("TinyLLama-v0.ggmlv3.q4_0.bin").getFile());
-            MODEL_PATH = model.getAbsolutePath();
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
-    }
+    private static final String MODEL_PATH = TestUtils.getResourceAbsolutePath("tinyllamas-stories-260k-f32.gguf");
+    private static final String Q8_0_MODEL_PATH = TestUtils.getResourceAbsolutePath("tinyllamas-stories-260k-q8_0.gguf");
 
     @Test
     public void test_init_model() throws Exception {
@@ -74,9 +66,62 @@ public class LlamaModelImplTest {
         String text = "你好！From LLaMA.cpp";
         int[] tokens = model.tokenize(text, false);
         System.out.println(Arrays.toString(tokens));
-        String decoded = model.detokenize(tokens);
+
+        // remove leading BOS
+        String decoded = model.detokenize(tokens).trim();
+
         System.out.printf("Decoded -> %s%n", decoded);
         assertThat(StringUtils.equals(text, decoded)).isTrue();
+    }
+
+    @Test
+    public void test_detokenize_in_sequence() throws Exception {
+        ModelParameters params = ModelParameters.builder()
+                .modelPath(MODEL_PATH)
+                .nThreads(4)
+                .build();
+        LlamaModel model = new LlamaModelImpl(params);
+
+        String text = "你好！世界！";
+        int[] tokens = model.tokenize(text, false);
+
+        // BOS is not added
+        for (int token : tokens) {
+            assertThat(token).isNotEqualTo(model.bosToken());
+        }
+
+        StringBuilder builder = new StringBuilder();
+
+        int i = 0, j = 0;
+        int nPiece = 0;
+        while (i < tokens.length) {
+            while (true) {
+                if (j > tokens.length) {
+                    break;
+                }
+                String piece = model.detokenize(Arrays.copyOfRange(tokens, i, j));
+                if (StringUtils.isBlank(piece)) {
+                    j++;
+                } else {
+                    // left trim the first piece to remove the BOS token
+                    if (nPiece == 0) {
+                        piece = piece.replaceAll("^\\s+", "");
+                    }
+                    System.out.printf("tokens = [%d, %d] -> str = [%s]\n", i, j, piece);
+                    builder.append(piece);
+                    i = j;
+                    nPiece++;
+                    break;
+                }
+            }
+        }
+
+        String result = builder.toString();
+
+        System.out.printf("Final output = [%s]\n", result);
+        assertThat(StringUtils.equals(text, result)).isTrue();
+
+        model.close();
     }
 
     @Test
@@ -138,6 +183,58 @@ public class LlamaModelImplTest {
 
         String response = model.detokenize(toArray(lastTokens));
         System.out.println(response);
+
+        model.close();
+    }
+
+    @Test
+    public void test_inference_stream_decode_with_GPU() throws Exception {
+        // Model initialization
+        ModelParameters params = ModelParameters.builder()
+                .modelPath(Q8_0_MODEL_PATH) // Q8_0 is supported by GPU
+                .nThreads(4)
+                .contextSize(2048)
+                .extra(ImmutableMap.of(
+                        "n_gpu_layers", "4"
+                ))
+                .build();
+        LlamaModel model = new LlamaModelImpl(params);
+        assertThat(model).isNotNull();
+
+        // Prompt processing
+        String prompt = "Once upon a time, there was a little girl named Alice. She loved playing guitar and piano. One day, she";
+        int[] tokens = model.tokenize(prompt, true);
+        model.evaluate(tokens);
+
+        System.out.println("\n==================== PROMPT ====================");
+        System.out.print(prompt);
+
+        // Inference
+        int maxTokens = 2048;
+        PenalizeParameters penalizeParams = PenalizeParameters.builder().build();
+        SamplingParameters samplingParameters = SamplingParameters.builder().build();
+
+        System.out.println("\n==================== RESPONSE ====================");
+
+        ArrayList<Integer> cache = new ArrayList<>();
+        for (int i = 0; i < maxTokens; i++) {
+            int id = model.sample(samplingParameters, penalizeParams);
+            if (id == model.eosToken()) {
+                break;
+            }
+
+            // stream decode
+            cache.add(id);
+            String piece = model.detokenize(toArray(cache));
+            if (StringUtils.isNotBlank(piece)) {
+                cache.clear();
+                System.out.print(piece);
+            }
+
+            model.evaluate(new int[]{id});
+
+            Thread.sleep(1);
+        }
 
         model.close();
     }
