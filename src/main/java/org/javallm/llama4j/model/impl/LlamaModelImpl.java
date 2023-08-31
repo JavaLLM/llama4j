@@ -426,12 +426,15 @@ public class LlamaModelImpl implements LlamaModel {
     private llama_context_params initLLaMAContextParams(ModelParameters params) {
         llama_context_params llama_params = llama_context_default_params();
 
+        int nGPULayers = Integer.parseInt(params.getExtra().getOrDefault("n_gpu_layers", "0"));
+        llama_params.n_gpu_layers(nGPULayers);
+
         llama_params.n_ctx(params.getContextSize());
         llama_params.n_batch(params.getBatchSize());
         llama_params.seed(params.getSeed());
 
-//        llama_params.rope_freq_base(params.getRopeFreqBase());
-//        llama_params.rope_freq_scale(params.getRopeFreqScale());
+        llama_params.rope_freq_base(params.getRopeFreqBase());
+        llama_params.rope_freq_scale(params.getRopeFreqScale());
 
         llama_params.embedding(params.isEmbeddingMode());
 

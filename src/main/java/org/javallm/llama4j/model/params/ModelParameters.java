@@ -9,6 +9,8 @@ import lombok.ToString;
 
 import javax.annotation.Nullable;
 import java.io.File;
+import java.util.HashMap;
+import java.util.Map;
 
 @Builder
 @ToString
@@ -95,6 +97,10 @@ public final class ModelParameters {
     @Getter
     @Builder.Default
     private boolean embeddingMode = false;
+
+    @Getter
+    @Builder.Default
+    private Map<String, String> extra = new HashMap<>();
 
     @AssertTrue(message = "modelPath cannot be resolved, please check")
     public boolean isModelPathValid() {
