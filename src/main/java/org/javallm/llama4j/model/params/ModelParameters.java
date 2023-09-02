@@ -28,13 +28,6 @@ public final class ModelParameters {
     private int contextSize = 512;
 
     /**
-     * This parameter allows users to retain the original prompt when the model runs out of context, ensuring a connection to the initial instruction or conversation topic is maintained. It specifies the number of tokens from the initial prompt to retain when the model resets its internal context. By default, this value is set to 0 (meaning no tokens are kept). Use -1 to retain all tokens from the initial prompt.
-     */
-    @Getter
-    @Builder.Default
-    private int keepInitPromptTokensCnt = 0;
-
-    /**
      * Batch size for prompt processing (must be >= 32 to use BLAS)
      */
     @Min(value = 0, message = "batchSize for prompt processing must larger than 0")

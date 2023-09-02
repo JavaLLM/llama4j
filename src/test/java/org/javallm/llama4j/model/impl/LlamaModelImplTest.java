@@ -151,6 +151,23 @@ public class LlamaModelImplTest {
                 .contextSize(2048)
                 .build();
         LlamaModel model = new LlamaModelImpl(params);
+        test_inference_with_model(model);
+    }
+
+    @Test
+    public void test_inference_with_GPU() throws Exception {
+        ModelParameters params = ModelParameters.builder()
+                .modelPath(Q8_0_MODEL_PATH)
+                .nThreads(4)
+                .extra(ImmutableMap.of(
+                        "n_gpu_layers", "4"
+                ))
+                .build();
+        LlamaModel model = new LlamaModelImpl(params);
+        test_inference_with_model(model);
+    }
+
+    private void test_inference_with_model(LlamaModel model) throws Exception {
         assertThat(model).isNotNull();
 
         // Prompt processing
@@ -181,22 +198,19 @@ public class LlamaModelImplTest {
             model.evaluate(new int[]{id});
         }
 
-        String response = model.detokenize(toArray(lastTokens));
+        String response = model.detokenize(toArray(lastTokens), false);
         System.out.println(response);
 
         model.close();
     }
 
     @Test
-    public void test_inference_stream_decode_with_GPU() throws Exception {
+    public void test_inference_stream_decode() throws Exception {
         // Model initialization
         ModelParameters params = ModelParameters.builder()
-                .modelPath(Q8_0_MODEL_PATH) // Q8_0 is supported by GPU
+                .modelPath(MODEL_PATH)
                 .nThreads(4)
                 .contextSize(2048)
-                .extra(ImmutableMap.of(
-                        "n_gpu_layers", "4"
-                ))
                 .build();
         LlamaModel model = new LlamaModelImpl(params);
         assertThat(model).isNotNull();

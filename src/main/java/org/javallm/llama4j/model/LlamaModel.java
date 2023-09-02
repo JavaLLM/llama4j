@@ -19,12 +19,16 @@ public interface LlamaModel extends AutoCloseable {
         return tokenize(text, true);
     }
 
+    default String detokenize(int[] tokens) {
+        return detokenize(tokens, true);
+    }
+
     /**
      * Recover text from tokens, return null if the tokens do not contain a valid UTF-8 String
      * @param tokens tokens to be de-tokenized
      * @return the resulting text
      */
-    String detokenize(int[] tokens);
+    String detokenize(int[] tokens, boolean discardInvalidResult);
 
     default void reset() {
         reset(0);

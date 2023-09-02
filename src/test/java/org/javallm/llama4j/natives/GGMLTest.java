@@ -8,7 +8,7 @@ import org.javallm.llamacpp.ggml_tensor;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.javallm.llamacpp.global.ggml.*;
+import static org.javallm.llamacpp.global.llama.*;
 
 public class GGMLTest {
     @Test
