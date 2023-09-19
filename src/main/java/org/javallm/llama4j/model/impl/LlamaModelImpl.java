@@ -171,8 +171,8 @@ public class LlamaModelImpl implements LlamaModel {
             int n = llama_token_to_piece(_context, token, buffer, bufferSize);
             if (n < 0) {
                 buffer.close();
-                buffer = new BytePointer(n);
-                int check = llama_token_to_piece(_context, token, buffer, n);
+                buffer = new BytePointer(-n);
+                int check = llama_token_to_piece(_context, token, buffer, -n);
                 Preconditions.checkState(check == -n);
             }
 
