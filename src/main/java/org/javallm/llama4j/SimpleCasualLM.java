@@ -10,6 +10,7 @@ import org.javallm.llama4j.model.impl.LlamaModelImpl;
 import org.javallm.llama4j.model.params.ModelParameters;
 import org.javallm.llama4j.model.params.PenalizeParameters;
 import org.javallm.llama4j.model.params.SamplingParameters;
+import org.javallm.llamacpp.global.llama;
 
 import java.util.ArrayList;
 import java.util.function.Consumer;

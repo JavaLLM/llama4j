@@ -138,6 +138,7 @@ public class LlamaModelImpl implements LlamaModel {
         int nTokens = llama_tokenize(
                 this._context,
                 input,
+                nBytes,
                 tokens,
                 contextSize(),
                 addBos);
@@ -147,6 +148,7 @@ public class LlamaModelImpl implements LlamaModel {
             nTokens = llama_tokenize(
                     this._context,
                     input,
+                    nBytes,
                     tokens,
                     nTokens,
                     addBos
