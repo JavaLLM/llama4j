@@ -28,7 +28,7 @@ public class LlamaModelImpl implements LlamaModel {
     /******************** State ***********************/
     private int nPastTokens = 0;
     private final int[] inputTokens;
-    private final float[][] inputLogits;
+//    private final float[][] inputLogits;
 
     /******************** LLaMA.cpp internal ***********************/
     private final llama_context_params _params;
@@ -84,7 +84,7 @@ public class LlamaModelImpl implements LlamaModel {
 
         // pre-allocate arrays for storing input tokens and the corresponding logits
         this.inputTokens = new int[contextSize()];
-        this.inputLogits = new float[contextSize()][vocabSize()];
+//        this.inputLogits = new float[contextSize()][vocabSize()];
     }
 
     /**
@@ -210,7 +210,7 @@ public class LlamaModelImpl implements LlamaModel {
         // shift tokens and logits
         int offset = -(this.nPastTokens - nPastTokens);
         ArrayUtils.shift(this.inputTokens, offset);
-        ArrayUtils.shift(this.inputLogits, offset);
+//        ArrayUtils.shift(this.inputLogits, offset);
 
         // update nPastTokens
         this.nPastTokens = nPastTokens;
@@ -243,9 +243,9 @@ public class LlamaModelImpl implements LlamaModel {
             System.arraycopy(batch, 0, this.inputTokens, this.nPastTokens, actualBatchSize);
 
             // save logits
-            float[] logits = new float[this.vocabSize()];
-            llama_get_logits(this._context).get(logits);
-            System.arraycopy(logits, 0, this.inputLogits[this.nPastTokens], 0, this.vocabSize());
+//            float[] logits = new float[this.vocabSize()];
+//            llama_get_logits(this._context).get(logits);
+//            System.arraycopy(logits, 0, this.inputLogits[this.nPastTokens], 0, this.vocabSize());
 
             // update nPastTokens
             this.nPastTokens += actualBatchSize;
@@ -260,38 +260,38 @@ public class LlamaModelImpl implements LlamaModel {
         // TODO: Apply logit processors
 
         // Apply penalty
-        llama_token_data_array candidates = penalize(penalizeParameters, logits);
+        try (llama_token_data_array candidates = penalize(penalizeParameters, logits)) {
+            // Greedy sampling
+            if (samplingParams.getTemperature() <= 0) {
+                return llama_sample_token_greedy(_context, candidates);
+            }
 
-        // Greedy sampling
-        if (samplingParams.getTemperature() <= 0) {
-            return llama_sample_token_greedy(_context, candidates);
-        }
+            // Miro State Sample Algorithm
+            float mu = 2.0f * samplingParams.getMiroStatTau();
+            FloatPointer miroStatMu = new FloatPointer(1);
+            miroStatMu.put(mu);
 
-        // Miro State Sample Algorithm
-        float mu = 2.0f * samplingParams.getMiroStatTau();
-        FloatPointer miroStatMu = new FloatPointer(1);
-        miroStatMu.put(mu);
+            switch (samplingParams.getMiroStatStrategy()) {
+                // micro state sampling algorithm v1
+                case V1:
+                    int miroStatM = 100;
+                    llama_sample_temperature(_context, candidates, samplingParams.getTemperature());
+                    return llama_sample_token_mirostat(_context, candidates, samplingParams.getMiroStatTau(), samplingParams.getMiroStatEta(), miroStatM, miroStatMu);
+                // micro state sampling algorithm v2
+                case V2:
+                    llama_sample_temperature(_context, candidates, samplingParams.getTemperature());
+                    return llama_sample_token_mirostat_v2(_context, candidates, samplingParams.getMiroStatTau(), samplingParams.getMiroStatEta(), miroStatMu);
+                case DISABLE:
+                default:
+                    // Temperature sampling
+                    llama_sample_top_k(_context, candidates, samplingParams.getTopK(), 1);
+                    llama_sample_tail_free(_context, candidates, samplingParams.getTsfZ(), 1);
+                    llama_sample_typical(_context, candidates, samplingParams.getTypicalP(), 1);
+                    llama_sample_top_p(_context, candidates, samplingParams.getTopP(), 1);
+                    llama_sample_temperature(_context, candidates, samplingParams.getTemperature());
 
-        switch (samplingParams.getMiroStatStrategy()) {
-            // micro state sampling algorithm v1
-            case V1:
-                int miroStatM = 100;
-                llama_sample_temperature(_context, candidates, samplingParams.getTemperature());
-                return llama_sample_token_mirostat(_context, candidates, samplingParams.getMiroStatTau(), samplingParams.getMiroStatEta(), miroStatM, miroStatMu);
-            // micro state sampling algorithm v2
-            case V2:
-                llama_sample_temperature(_context, candidates, samplingParams.getTemperature());
-                return llama_sample_token_mirostat_v2(_context, candidates, samplingParams.getMiroStatTau(), samplingParams.getMiroStatEta(), miroStatMu);
-            case DISABLE:
-            default:
-                // Temperature sampling
-                llama_sample_top_k(_context, candidates, samplingParams.getTopK(), 1);
-                llama_sample_tail_free(_context, candidates, samplingParams.getTsfZ(), 1);
-                llama_sample_typical(_context, candidates, samplingParams.getTypicalP(), 1);
-                llama_sample_top_p(_context, candidates, samplingParams.getTopP(), 1);
-                llama_sample_temperature(_context, candidates, samplingParams.getTemperature());
-
-                return llama_sample_token(_context, candidates);
+                    return llama_sample_token(_context, candidates);
+            }
         }
     }
 
@@ -330,12 +330,10 @@ public class LlamaModelImpl implements LlamaModel {
         // Collect token candidates
         llama_token_data dataArray = new llama_token_data(vocabSize());
         for (int tokenId = 0; tokenId < vocabSize(); tokenId++) {
-            llama_token_data tokenData = new llama_token_data();
+            llama_token_data tokenData = dataArray.getPointer(tokenId);
             tokenData.id(tokenId);
             tokenData.logit(logits[tokenId]);
             tokenData.p(.0f);
-
-            dataArray.getPointer(tokenId).put(tokenData.getPointer());
         }
 
         llama_token_data_array candidates = new llama_token_data_array();
@@ -455,7 +453,8 @@ public class LlamaModelImpl implements LlamaModel {
 
     @Override
     public float[][] inputLogits() {
-        return ArrayUtils.subarray(this.inputLogits, 0, this.nPastTokens);
+//        return ArrayUtils.subarray(this.inputLogits, 0, this.nPastTokens);
+        return null;
     }
 
     private void debug(Runnable action) {
