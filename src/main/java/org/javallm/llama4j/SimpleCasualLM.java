@@ -1,7 +1,3 @@
-/*
- * Ant Group
- * Copyright (c) 2004-2023 All Rights Reserved.
- */
 package org.javallm.llama4j;
 
 import org.apache.commons.lang3.StringUtils;
