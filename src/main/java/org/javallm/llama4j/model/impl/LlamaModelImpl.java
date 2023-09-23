@@ -28,7 +28,6 @@ public class LlamaModelImpl implements LlamaModel {
     /******************** State ***********************/
     private int nPastTokens = 0;
     private final int[] inputTokens;
-//    private final float[][] inputLogits;
 
     /******************** LLaMA.cpp internal ***********************/
     private final llama_context_params _params;
@@ -78,13 +77,16 @@ public class LlamaModelImpl implements LlamaModel {
         applyLoRA();
 
         if (modelParams.isVerbose()) {
-            BytePointer info = llama_print_system_info();
-            System.out.println(new String(info.getStringBytes(), StandardCharsets.UTF_8));
+            try (BytePointer info = llama_print_system_info()) {
+                System.out.println(new String(info.getStringBytes(), StandardCharsets.UTF_8));
+            }
         }
 
         // pre-allocate arrays for storing input tokens and the corresponding logits
         this.inputTokens = new int[contextSize()];
-//        this.inputLogits = new float[contextSize()][vocabSize()];
+
+        // warming up the model
+        warmUp();
     }
 
     /**
@@ -93,12 +95,23 @@ public class LlamaModelImpl implements LlamaModel {
     private void applyLoRA() {
         if (StringUtils.isNoneBlank(modelParams.getLoraPath())) {
             String loraBase = StringUtils.isNotBlank(modelParams.getLoraBase()) ? modelParams.getLoraBase() : null;
-            int resultCode = llama_model_apply_lora_from_file(this._model, modelParams.getLoraPath(), loraBase, modelParams.getNThreads());
+            int resultCode = llama_model_apply_lora_from_file(this._model, modelParams.getLoraPath(), loraBase,
+                    modelParams.getNThreads());
             if (resultCode != 0) {
                 // TODO: need special Exception class
-                throw new RuntimeException(String.format("Failed to apply LoRA with loraBase=%s and loraPath=%s", modelParams.getLoraBase(), modelParams.getLoraPath()));
+                throw new RuntimeException(String.format("Failed to apply LoRA with loraBase=%s and loraPath=%s",
+                        modelParams.getLoraBase(), modelParams.getLoraPath()));
             }
         }
+    }
+
+    /**
+     * Warming up the model with an empty run
+     */
+    private void warmUp() {
+        int[] warmUpTokens = new int[] { bosToken(), eosToken() };
+        evaluate(warmUpTokens);
+        reset();
     }
 
     @Override
@@ -118,7 +131,8 @@ public class LlamaModelImpl implements LlamaModel {
         Preconditions.checkNotNull(state);
         int stateSize = (int) llama_get_state_size(_context);
         if (state.length != stateSize) {
-            throw new IllegalArgumentException(String.format("stateSize not match! expected = %d Bytes, actual = %d Bytes", stateSize, state.length));
+            throw new IllegalArgumentException(String
+                    .format("stateSize not match! expected = %d Bytes, actual = %d Bytes", stateSize, state.length));
         }
         llama_set_state_data(_context, state);
     }
@@ -151,8 +165,7 @@ public class LlamaModelImpl implements LlamaModel {
                     nBytes,
                     tokens,
                     nTokens,
-                    addBos
-            );
+                    addBos);
             if (nTokens < 0) {
                 throw new RuntimeException("Error happened during tokenization!");
             }
@@ -166,7 +179,8 @@ public class LlamaModelImpl implements LlamaModel {
     @Override
     public String detokenize(int[] tokens, boolean discardInvalidResult) {
         ByteArrayOutputStream stream = new ByteArrayOutputStream();
-        // We must detokenize all bytes at once, since a word can be represented by more than one byte
+        // We must detokenize all bytes at once, since a word can be represented by more
+        // than one byte
         for (int token : tokens) {
             int bufferSize = 8;
             BytePointer buffer = new BytePointer(bufferSize);
@@ -190,7 +204,9 @@ public class LlamaModelImpl implements LlamaModel {
     }
 
     /**
-     * Convert bytes to UTF-8 String. If the byte array contains incomplete code point, discard it
+     * Convert bytes to UTF-8 String. If the byte array contains incomplete code
+     * point, discard it
+     * 
      * @param bytes input
      * @return resulting string
      */
@@ -205,15 +221,18 @@ public class LlamaModelImpl implements LlamaModel {
     @Override
     public void reset(int nPastTokens) {
         Preconditions.checkState(nPastTokens >= 0, "nPastToken should >= 0");
-        Preconditions.checkState(nPastTokens <= this.contextSize() && nPastTokens <= this.nPastTokens, "nPastToken is too large!");
+        Preconditions.checkState(nPastTokens <= this.contextSize() && nPastTokens <= this.nPastTokens,
+                "nPastToken is too large!");
 
         // shift tokens and logits
         int offset = -(this.nPastTokens - nPastTokens);
         ArrayUtils.shift(this.inputTokens, offset);
-//        ArrayUtils.shift(this.inputLogits, offset);
 
         // update nPastTokens
         this.nPastTokens = nPastTokens;
+
+        // reset timings
+        llama_reset_timings(this._context);
     }
 
     @Override
@@ -225,7 +244,8 @@ public class LlamaModelImpl implements LlamaModel {
             int actualBatchSize = Math.min(modelParams.getBatchSize(), nTokens - i);
 
             // Infinite text generation via context swapping
-            // i.e., when the context window runs out, only retain (approximately) half of the tokens
+            // i.e., when the context window runs out, only retain (approximately) half of
+            // the tokens
             if (this.nPastTokens + actualBatchSize >= contextSize()) {
                 int nPastTokens = contextSize() - Math.max(actualBatchSize, contextSize() / 2);
                 reset(nPastTokens);
@@ -237,15 +257,11 @@ public class LlamaModelImpl implements LlamaModel {
                 throw new RuntimeException(String.format("Fail to eval tokens: %s", Arrays.toString(tokens)));
             }
 
-            Preconditions.checkState(this.nPastTokens >= 0 && this.nPastTokens + actualBatchSize <= this.inputTokens.length - 1);
+            Preconditions.checkState(
+                    this.nPastTokens >= 0 && this.nPastTokens + actualBatchSize <= this.inputTokens.length - 1);
 
             // save tokens
             System.arraycopy(batch, 0, this.inputTokens, this.nPastTokens, actualBatchSize);
-
-            // save logits
-//            float[] logits = new float[this.vocabSize()];
-//            llama_get_logits(this._context).get(logits);
-//            System.arraycopy(logits, 0, this.inputLogits[this.nPastTokens], 0, this.vocabSize());
 
             // update nPastTokens
             this.nPastTokens += actualBatchSize;
@@ -276,11 +292,13 @@ public class LlamaModelImpl implements LlamaModel {
                 case V1:
                     int miroStatM = 100;
                     llama_sample_temperature(_context, candidates, samplingParams.getTemperature());
-                    return llama_sample_token_mirostat(_context, candidates, samplingParams.getMiroStatTau(), samplingParams.getMiroStatEta(), miroStatM, miroStatMu);
+                    return llama_sample_token_mirostat(_context, candidates, samplingParams.getMiroStatTau(),
+                            samplingParams.getMiroStatEta(), miroStatM, miroStatMu);
                 // micro state sampling algorithm v2
                 case V2:
                     llama_sample_temperature(_context, candidates, samplingParams.getTemperature());
-                    return llama_sample_token_mirostat_v2(_context, candidates, samplingParams.getMiroStatTau(), samplingParams.getMiroStatEta(), miroStatMu);
+                    return llama_sample_token_mirostat_v2(_context, candidates, samplingParams.getMiroStatTau(),
+                            samplingParams.getMiroStatEta(), miroStatMu);
                 case DISABLE:
                 default:
                     // Temperature sampling
@@ -298,7 +316,8 @@ public class LlamaModelImpl implements LlamaModel {
     @Override
     public float[] embed(String input) {
         if (!this.modelParams.isEmbeddingMode()) {
-            throw new UnsupportedOperationException("Llama model must be called with parameter `embeddingMode=True` to call this method!");
+            throw new UnsupportedOperationException(
+                    "Llama model must be called with parameter `embeddingMode=True` to call this method!");
         }
 
         debug(() -> llama_reset_timings(this._context));
@@ -356,8 +375,7 @@ public class LlamaModelImpl implements LlamaModel {
                 candidates,
                 tokensToBePenalized,
                 lastNRepeat,
-                params.getRepeatPenalty()
-        );
+                params.getRepeatPenalty());
 
         llama_sample_frequency_and_presence_penalties(
                 _context,
@@ -365,8 +383,7 @@ public class LlamaModelImpl implements LlamaModel {
                 tokensToBePenalized,
                 lastNRepeat,
                 params.getAlphaFrequency(),
-                params.getAlphaPresence()
-        );
+                params.getAlphaPresence());
 
         // If the new line token is not penalized, restore its logit value
         if (!params.isPenalizeNewLine()) {
@@ -453,7 +470,6 @@ public class LlamaModelImpl implements LlamaModel {
 
     @Override
     public float[][] inputLogits() {
-//        return ArrayUtils.subarray(this.inputLogits, 0, this.nPastTokens);
         return null;
     }
 
