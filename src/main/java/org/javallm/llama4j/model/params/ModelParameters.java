@@ -3,96 +3,74 @@ package org.javallm.llama4j.model.params;
 import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
-import lombok.Builder;
-import lombok.Getter;
-import lombok.ToString;
+import lombok.Data;
+import lombok.experimental.Accessors;
 
 import javax.annotation.Nullable;
 import java.io.File;
 import java.util.HashMap;
 import java.util.Map;
 
-@Builder
-@ToString
+@Accessors(chain = true)
+@Data
 public final class ModelParameters {
-    @Getter
-    @Builder.Default
     private boolean verbose = false;
 
     /**
      * Model context size
      */
     @Min(value = 8, message = "contextSize must larger than 512!")
-    @Getter
-    @Builder.Default
     private int contextSize = 512;
 
     /**
      * Batch size for prompt processing (must be >= 32 to use BLAS)
      */
     @Min(value = 0, message = "batchSize for prompt processing must larger than 0")
-    @Getter
-    @Builder.Default
     private int batchSize = 64;
 
     /**
      * The random seed
      */
-    @Getter
-    @Builder.Default
     private int seed = -1;
 
     /**
      * The path to the model
      */
     @NotBlank(message = "modelPath must be provided")
-    @Getter
     private String modelPath;
 
     /**
      * Number of threads for evaluating inputs, set to -1 for auto-detection
      */
-    @Getter
-    @Builder.Default
     private int nThreads = Math.max(Math.round(Runtime.getRuntime().availableProcessors() / 2.0f), 1);
 
     /**
      * Base frequency for RoPE sampling.
      */
-    @Getter
-    @Builder.Default
     private float ropeFreqBase = 10000.0f;
 
     /**
      * Scaling factor for RoPE sampling.
      */
-    @Getter
-    @Builder.Default
     private float ropeFreqScale = 1.0f;
 
     /**
      * Path to the LoRA (Low-Rank Adaptation) adapter file to be applied to the model.
      */
-    @Getter
     @Nullable
     private String loraPath;
 
     /**
      * Optional model to use as a base for the layers modified by the LoRA adapter.
      */
-    @Getter
     @Nullable
     private String loraBase;
 
     /**
      * Embedding mode
      */
-    @Getter
-    @Builder.Default
     private boolean embeddingMode = false;
 
-    @Getter
-    @Builder.Default
     private Map<String, String> extra = new HashMap<>();
 
     @AssertTrue(message = "modelPath cannot be resolved, please check")

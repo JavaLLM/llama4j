@@ -49,13 +49,6 @@ public interface LlamaModel extends AutoCloseable {
      */
     int sample(SamplingParameters samplingParams, PenalizeParameters penalizeParameters);
 
-    default int sample() {
-        SamplingParameters samplingParams = SamplingParameters.builder().build();
-        PenalizeParameters penalizeParams = PenalizeParameters.builder().build();
-
-        return sample(samplingParams, penalizeParams);
-    }
-
     /**
      * Embed an input string with the model
      * @param input the input string

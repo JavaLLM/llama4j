@@ -19,12 +19,11 @@ public class SimpleCasualLM {
     private final LlamaModel model;
 
     public SimpleCasualLM(String path) {
-        ModelParameters params = ModelParameters.builder()
-                .modelPath(path)
-                .nThreads(8)
-                .contextSize(2048)
-                .batchSize(512)
-                .build();
+        ModelParameters params = new ModelParameters()
+                .setModelPath(path)
+                .setNThreads(8)
+                .setContextSize(2048)
+                .setBatchSize(512);
         model = new LlamaModelImpl(params);
     }
 
@@ -33,12 +32,8 @@ public class SimpleCasualLM {
     }
 
     public void infer(String prompt, Consumer<String> callback) {
-        SamplingParameters samplingParams = SamplingParameters
-                .builder()
-                .build();
-        PenalizeParameters penalizeParams = PenalizeParameters
-                .builder()
-                .build();
+        SamplingParameters samplingParams = new SamplingParameters();
+        PenalizeParameters penalizeParams = new PenalizeParameters();
         infer(prompt, samplingParams, penalizeParams, callback);
     }
 

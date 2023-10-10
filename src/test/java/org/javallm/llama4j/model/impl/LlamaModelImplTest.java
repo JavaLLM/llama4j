@@ -22,10 +22,9 @@ public class LlamaModelImplTest {
 
     @Test
     public void test_init_model() throws Exception {
-        ModelParameters params = ModelParameters.builder()
-                .modelPath(MODEL_PATH)
-                .nThreads(8)
-                .build();
+        ModelParameters params = new ModelParameters()
+                .setModelPath(MODEL_PATH)
+                .setNThreads(8);
 
         System.out.printf("Loading Llama model with parameters: %s", params);
 
@@ -36,18 +35,15 @@ public class LlamaModelImplTest {
 
     @Test
     public void test_model_path_valid() {
-        ModelParameters params = ModelParameters.builder()
-                .modelPath(MODEL_PATH)
-                .build();
+        ModelParameters params = new ModelParameters()
+                .setModelPath(MODEL_PATH);
         assertThat(params.isModelPathValid()).isTrue();
     }
 
     @Test
     public void test_init_model_path_not_exist() {
-        ModelParameters params = ModelParameters.builder()
-                .modelPath("NOT_EXISTS")
-                .build();
-
+        ModelParameters params = new ModelParameters()
+                .setModelPath("NOT_EXISTS");
         System.out.printf("Loading Llama model with parameters: %s", params);
 
         assertThatThrownBy(() -> new LlamaModelImpl(params))
@@ -56,10 +52,9 @@ public class LlamaModelImplTest {
 
     @Test
     public void test_tokenize() {
-        ModelParameters params = ModelParameters.builder()
-                .modelPath(MODEL_PATH)
-                .nThreads(4)
-                .build();
+        ModelParameters params = new ModelParameters()
+                .setModelPath(MODEL_PATH)
+                .setNThreads(4);
         LlamaModel model = new LlamaModelImpl(params);
         assertThat(model).isNotNull();
 
@@ -76,10 +71,9 @@ public class LlamaModelImplTest {
 
     @Test
     public void test_detokenize_in_sequence() throws Exception {
-        ModelParameters params = ModelParameters.builder()
-                .modelPath(MODEL_PATH)
-                .nThreads(4)
-                .build();
+        ModelParameters params = new ModelParameters()
+                .setModelPath(MODEL_PATH)
+                .setNThreads(4);
         LlamaModel model = new LlamaModelImpl(params);
 
         String text = "你好！世界！";
@@ -126,12 +120,11 @@ public class LlamaModelImplTest {
 
     @Test
     public void test_embedding() {
-        ModelParameters params = ModelParameters.builder()
-                .verbose(true)
-                .modelPath(MODEL_PATH)
-                .embeddingMode(true)
-                .nThreads(8)
-                .build();
+        ModelParameters params = new ModelParameters()
+                .setVerbose(true)
+                .setModelPath(MODEL_PATH)
+                .setEmbeddingMode(true)
+                .setNThreads(8);
 
         LlamaModel model = new LlamaModelImpl(params);
         assertThat(model).isNotNull();
@@ -145,24 +138,22 @@ public class LlamaModelImplTest {
     @Test
     public void test_inference_simple() throws Exception {
         // Model initialization
-        ModelParameters params = ModelParameters.builder()
-                .modelPath(MODEL_PATH)
-                .nThreads(4)
-                .contextSize(2048)
-                .build();
+        ModelParameters params = new ModelParameters()
+                .setModelPath(MODEL_PATH)
+                .setNThreads(4)
+                .setContextSize(2048);
         LlamaModel model = new LlamaModelImpl(params);
         test_inference_with_model(model);
     }
 
     @Test
     public void test_inference_with_GPU() throws Exception {
-        ModelParameters params = ModelParameters.builder()
-                .modelPath(Q8_0_MODEL_PATH)
-                .nThreads(4)
-                .extra(ImmutableMap.of(
+        ModelParameters params = new ModelParameters()
+                .setModelPath(Q8_0_MODEL_PATH)
+                .setNThreads(4)
+                .setExtra(ImmutableMap.of(
                         "n_gpu_layers", "4"
-                ))
-                .build();
+                ));
         LlamaModel model = new LlamaModelImpl(params);
         test_inference_with_model(model);
     }
@@ -184,8 +175,8 @@ public class LlamaModelImplTest {
 
         // Inference
         int maxTokens = 1000;
-        PenalizeParameters penalizeParams = PenalizeParameters.builder().build();
-        SamplingParameters samplingParameters = SamplingParameters.builder().build();
+        PenalizeParameters penalizeParams = new PenalizeParameters();
+        SamplingParameters samplingParameters = new SamplingParameters();
 
         for (int i = 0; i < maxTokens; i++) {
             int id = model.sample(samplingParameters, penalizeParams);
@@ -207,11 +198,10 @@ public class LlamaModelImplTest {
     @Test
     public void test_inference_stream_decode() throws Exception {
         // Model initialization
-        ModelParameters params = ModelParameters.builder()
-                .modelPath(MODEL_PATH)
-                .nThreads(4)
-                .contextSize(2048)
-                .build();
+        ModelParameters params = new ModelParameters()
+                .setModelPath(MODEL_PATH)
+                .setNThreads(4)
+                .setContextSize(2048);
         LlamaModel model = new LlamaModelImpl(params);
         assertThat(model).isNotNull();
 
@@ -225,8 +215,8 @@ public class LlamaModelImplTest {
 
         // Inference
         int maxTokens = 2048;
-        PenalizeParameters penalizeParams = PenalizeParameters.builder().build();
-        SamplingParameters samplingParameters = SamplingParameters.builder().build();
+        PenalizeParameters penalizeParams = new PenalizeParameters();
+        SamplingParameters samplingParameters = new SamplingParameters();
 
         System.out.println("\n==================== RESPONSE ====================");
 
@@ -266,12 +256,11 @@ public class LlamaModelImplTest {
     @Test
     public void test_out_of_context() {
         // Model initialization
-        ModelParameters params = ModelParameters.builder()
-                .modelPath(MODEL_PATH)
-                .nThreads(4)
-                .contextSize(100)
-                .batchSize(32)
-                .build();
+        ModelParameters params = new ModelParameters()
+                .setModelPath(MODEL_PATH)
+                .setNThreads(4)
+                .setContextSize(100)
+                .setBatchSize(32);
         LlamaModel model = new LlamaModelImpl(params);
         assertThat(model).isNotNull();
 
