@@ -177,7 +177,7 @@ public class LlamaModelImpl implements LlamaModel {
     }
 
     @Override
-    public String detokenize(int[] tokens, boolean discardInvalidResult) {
+    public String detokenize(int[] tokens) {
         ByteArrayOutputStream stream = new ByteArrayOutputStream();
         // We must detokenize all bytes at once, since a word can be represented by more
         // than one byte
@@ -200,7 +200,7 @@ public class LlamaModelImpl implements LlamaModel {
             }
         }
         byte[] bytes = stream.toByteArray();
-        return convertToUtf8String(bytes, discardInvalidResult);
+        return convertToUtf8String(bytes);
     }
 
     /**
@@ -210,11 +210,8 @@ public class LlamaModelImpl implements LlamaModel {
      * @param bytes input
      * @return resulting string
      */
-    private String convertToUtf8String(byte[] bytes, boolean discardInvalidResult) {
+    private String convertToUtf8String(byte[] bytes) {
         String result = new String(bytes, StandardCharsets.UTF_8);
-        if (!discardInvalidResult) {
-            return result;
-        }
         return bytes.length == result.getBytes(StandardCharsets.UTF_8).length ? result : null;
     }
 

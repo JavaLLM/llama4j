@@ -8,7 +8,6 @@ import com.google.common.collect.ImmutableMap;
 import org.javallm.llama4j.SimpleCasualLM;
 import org.javallm.llama4j.TestUtils;
 import org.javallm.llama4j.model.params.ModelParameters;
-import org.javallm.llamacpp.global.llama;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -26,14 +25,12 @@ public class SimpleCasualLMTest {
 
     @Test
     public void test_infer_gpu() {
-        ModelParameters modelParameters = ModelParameters
-                .builder()
-                .modelPath(MODEL_PATH)
-                .contextSize(2048)
-                .extra(ImmutableMap.of(
+        ModelParameters modelParameters = new ModelParameters()
+                .setModelPath(MODEL_PATH)
+                .setContextSize(2048)
+                .setExtra(ImmutableMap.of(
                         "n_gpu_layers", "999"
-                ))
-                .build();
+                ));
         SimpleCasualLM client = new SimpleCasualLM(modelParameters);
         client.infer("Once upon a time, ", System.out::print);
     }

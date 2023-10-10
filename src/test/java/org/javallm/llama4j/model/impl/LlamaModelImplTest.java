@@ -189,7 +189,7 @@ public class LlamaModelImplTest {
             model.evaluate(new int[]{id});
         }
 
-        String response = model.detokenize(toArray(lastTokens), false);
+        String response = model.detokenize(toArray(lastTokens));
         System.out.println(response);
 
         model.close();
