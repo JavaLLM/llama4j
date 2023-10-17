@@ -5,6 +5,7 @@ import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
 import lombok.experimental.Accessors;
+import org.javallm.llama4j.conf.NameSpace;
 
 import javax.annotation.Nullable;
 import java.io.File;
@@ -13,9 +14,8 @@ import java.util.Map;
 
 @Accessors(chain = true)
 @Data
+@NameSpace("model")
 public final class ModelParameters {
-    private boolean verbose = false;
-
     /**
      * Model context size
      */
@@ -70,6 +70,16 @@ public final class ModelParameters {
      * Embedding mode
      */
     private boolean embeddingMode = false;
+
+    /**
+     * Number of layers to be offloaded to GPU
+     */
+    private int nGpuLayers = 0;
+
+    /**
+     * Print verbose logs or not
+     */
+    private boolean verbose = false;
 
     private Map<String, String> extra = new HashMap<>();
 

@@ -6,7 +6,6 @@ import org.javallm.llama4j.model.impl.LlamaModelImpl;
 import org.javallm.llama4j.model.params.ModelParameters;
 import org.javallm.llama4j.model.params.PenalizeParameters;
 import org.javallm.llama4j.model.params.SamplingParameters;
-import org.javallm.llamacpp.global.llama;
 
 import java.util.ArrayList;
 import java.util.function.Consumer;
@@ -15,8 +14,12 @@ import java.util.function.Consumer;
  * @author pengym
  * @version SimpleCasualLM.java, v 0.1 2023年09月02日 21:11 pengym
  */
-public class SimpleCasualLM {
+public class SimpleCasualLM implements AutoCloseable {
     private final LlamaModel model;
+
+    public static SimpleCasualLM fromConfig(String configPath) {
+        return null;
+    }
 
     public SimpleCasualLM(String path) {
         ModelParameters params = new ModelParameters()
@@ -63,5 +66,10 @@ public class SimpleCasualLM {
 
     private int[] toArray(ArrayList<Integer> list) {
         return list.stream().mapToInt(i -> i).toArray();
+    }
+
+    @Override
+    public void close() throws Exception {
+        model.close();
     }
 }

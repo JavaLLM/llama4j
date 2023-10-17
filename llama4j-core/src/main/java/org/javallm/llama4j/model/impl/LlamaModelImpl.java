@@ -6,6 +6,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.bytedeco.javacpp.BytePointer;
 import org.bytedeco.javacpp.FloatPointer;
 import org.javallm.llama4j.model.LlamaModel;
+import org.javallm.llama4j.model.params.MirostatStrategy;
 import org.javallm.llama4j.model.params.ModelParameters;
 import org.javallm.llama4j.model.params.PenalizeParameters;
 import org.javallm.llama4j.model.params.SamplingParameters;
@@ -284,7 +285,20 @@ public class LlamaModelImpl implements LlamaModel {
             FloatPointer miroStatMu = new FloatPointer(1);
             miroStatMu.put(mu);
 
-            switch (samplingParams.getMiroStatStrategy()) {
+            MirostatStrategy strategy = MirostatStrategy.getByCode(samplingParams.getMiroStatStrategy());
+
+            if (null == strategy || strategy == MirostatStrategy.DISABLE) {
+                // Temperature sampling
+                llama_sample_top_k(_context, candidates, samplingParams.getTopK(), 1);
+                llama_sample_tail_free(_context, candidates, samplingParams.getTsfZ(), 1);
+                llama_sample_typical(_context, candidates, samplingParams.getTypicalP(), 1);
+                llama_sample_top_p(_context, candidates, samplingParams.getTopP(), 1);
+                llama_sample_temperature(_context, candidates, samplingParams.getTemperature());
+
+                return llama_sample_token(_context, candidates);
+            }
+
+            switch (strategy) {
                 // micro state sampling algorithm v1
                 case V1:
                     int miroStatM = 100;
@@ -296,16 +310,8 @@ public class LlamaModelImpl implements LlamaModel {
                     llama_sample_temperature(_context, candidates, samplingParams.getTemperature());
                     return llama_sample_token_mirostat_v2(_context, candidates, samplingParams.getMiroStatTau(),
                             samplingParams.getMiroStatEta(), miroStatMu);
-                case DISABLE:
                 default:
-                    // Temperature sampling
-                    llama_sample_top_k(_context, candidates, samplingParams.getTopK(), 1);
-                    llama_sample_tail_free(_context, candidates, samplingParams.getTsfZ(), 1);
-                    llama_sample_typical(_context, candidates, samplingParams.getTypicalP(), 1);
-                    llama_sample_top_p(_context, candidates, samplingParams.getTopP(), 1);
-                    llama_sample_temperature(_context, candidates, samplingParams.getTemperature());
-
-                    return llama_sample_token(_context, candidates);
+                    throw new RuntimeException(String.format("Unknown mirostat sampling strategy: %s!", strategy));
             }
         }
     }

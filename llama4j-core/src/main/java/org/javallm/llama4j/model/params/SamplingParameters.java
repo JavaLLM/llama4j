@@ -1,8 +1,6 @@
 package org.javallm.llama4j.model.params;
 
-import lombok.Builder;
 import lombok.Data;
-import lombok.Getter;
 import lombok.experimental.Accessors;
 
 @Accessors(chain = true)
@@ -49,11 +47,11 @@ public final class SamplingParameters {
 
     // -------------------- Mirostat Sampling --------------------
     /**
-     * Enable Mirostat sampling, controlling perplexity during text generation
+     * Enable Mirostat sampling, controlling perplexity during text generation, see also {@link MirostatStrategy#getByCode}
      * <p>
      * Note: Mirostat is an algorithm that actively maintains the quality of generated text within a desired range during text generation. It aims to strike a balance between coherence and diversity, avoiding low-quality output caused by excessive repetition (boredom traps) or incoherence (confusion traps).
      */
-    private MirostatStrategy miroStatStrategy = MirostatStrategy.DISABLE;
+    private String miroStatStrategy = MirostatStrategy.DISABLE.getCode();
 
     /**
      * Set the Mirostat learning rate, parameter eta (default: 0.1).
